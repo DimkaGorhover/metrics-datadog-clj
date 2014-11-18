@@ -1,4 +1,4 @@
-(defproject loopme/metrics-datadog-clj "0.1.2"
+(defproject loopme/metrics-datadog-clj "0.1.3"
             :description ""
             :url "http://loopme.biz"
             :license {:name "MIT license"
@@ -15,5 +15,5 @@
                                       :username      :env
                                       :passphrase    :env
                                       :sign-releases false}]]
-            :dependencies [[org.clojure/clojure "1.5.1"]
+            :dependencies [[org.clojure/clojure "1.6.0"]
                            [org.coursera/metrics-datadog "1.0.2"]])

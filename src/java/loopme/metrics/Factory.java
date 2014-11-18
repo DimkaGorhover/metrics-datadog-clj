@@ -1,6 +1,6 @@
 package loopme.metrics;
 
-import com.codahale.metrics.*;
+import com.codahale.metrics.Gauge;
 
 import java.util.concurrent.Callable;
 
@@ -10,29 +10,16 @@ import java.util.concurrent.Callable;
  */
 public final class Factory {
 
-    private Factory() {}
+    private Factory() {
+    }
 
-    public static <T extends Number> Gauge<T> gauge(T value) {
-        final T newValue = value;
-        return new Gauge<T>() {
-            @Override
-            public T getValue() {
-                return newValue;
-            }
-        };
+    public static <T extends Number> SettableGauge<T> gauge(T value) {
+        SettableGauge<T> gauge = new NumberGauge<>();
+        gauge.setValue(value);
+        return gauge;
     }
 
     public static <T extends Number> Gauge<T> gauge(Callable<T> value) {
-        final Callable<T> newValue = value;
-        return new Gauge<T>() {
-            @Override
-            public T getValue() {
-                try {
-                    return newValue.call();
-                } catch (Exception e) {
-                    return null;
-                }
-            }
-        };
+        return new CallableGauge<>(value);
     }
 }

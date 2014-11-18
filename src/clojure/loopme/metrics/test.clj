@@ -29,8 +29,10 @@
       (inc-counter counter)
       (dec-counter counter)
       (inc-counter counter)
-
       (->> counter get-count (println "test count:"))
+
+      (set-gauge-val const -1)
+      (->> const get-gauge-val (println "test_const:"))
 
       (let [test-time (or (:test-time-ms config) (* 1000 60 5))]
         (println "test-time:" test-time "ms")

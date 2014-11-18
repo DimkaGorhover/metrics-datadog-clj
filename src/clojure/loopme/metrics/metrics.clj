@@ -1,6 +1,9 @@
 (ns loopme.metrics.metrics
   (:import [com.codahale.metrics Gauge Counter]
-           [loopme.metrics Factory]))
+           [loopme.metrics Factory SettableGauge]))
+
+; =============================================================================
+; gauge
 
 (defn
   ^{:doc "
@@ -34,6 +37,39 @@
       (if (number? res)
         (Factory/gauge ^Callable func)))))
 
+(defn
+  ^{:doc "
+  usages:
+
+  (def gauge (create-gauge 1))
+  (println (get-gauge-val gauge)) => 1
+
+  (def gauge (create-gauge 235.23))
+  (println (get-gauge-val gauge)) => 235.23
+
+  "}
+  ^Number get-gauge-val [^Gauge gauge]
+  (if gauge
+    (.getValue gauge)))
+
+(defn
+  ^{:doc "
+  usages:
+
+  (def gauge (create-gauge 1))
+  (println (get-gauge-val gauge)) => 1
+
+  (set-gauge-val gauge 235.23)
+  (println (get-gauge-val gauge)) => 235.23
+
+  "}
+  ^Counter set-gauge-val [^SettableGauge gauge ^Number number]
+  (if (and gauge number)
+    (.setValue ^SettableGauge gauge number)))
+
+; =============================================================================
+; counter
+
 (defn ^Counter create-counter []
   (Counter.))
 
@@ -42,7 +78,6 @@
   usages:
 
   (def counter (create-counter))
-
   (println (get-count counter))
 
   "}
