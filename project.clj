@@ -3,9 +3,8 @@
             :url "http://loopme.biz"
             :license {:name "MIT license"
                       :url  "http://opensource.org/licenses/MIT"}
-            :source-paths ["src"]
-            :java-source-paths ["src"]
-            :test-paths ["test"]
+            :source-paths ["src/clojure"]
+            :java-source-paths ["src/java"]
             :resource-paths ["resources"]
             :javac-options ["-target" "1.7"
                             "-source" "1.7"
