@@ -12,8 +12,9 @@
                             "-Xlint:-options"]
             :plugins [[s3-wagon-private "1.1.2"]]
             :warn-on-reflection true
-            :repositories [["loopme" {:url        "s3p://lm-artifacts/releases/"
-                                      :username   :env
-                                      :passphrase :env}]]
+            :repositories [["loopme" {:url           "s3p://lm-artifacts/releases/"
+                                      :username      :env
+                                      :passphrase    :env
+                                      :sign-releases false}]]
             :dependencies [[org.clojure/clojure "1.5.1"]
                            [org.coursera/metrics-datadog "1.0.2"]])
