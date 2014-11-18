@@ -1,4 +1,4 @@
-(defproject loopme/metrics-datadog-clj "0.1.3"
+(defproject loopme/metrics-datadog-clj "0.1.4"
             :description ""
             :url "http://loopme.biz"
             :license {:name "MIT license"
