@@ -1,8 +1,8 @@
 (ns loopme.metrics.connectors
   (:refer-clojure :exclude [replace])
   (:import [org.coursera.metrics.datadog.transport Transport HttpTransport$Builder UdpTransport$Builder]
-           [com.codahale.metrics MetricRegistry Metric]
-           [org.coursera.metrics.datadog DatadogReporter DatadogReporter$Builder]
+           [com.codahale.metrics MetricRegistry Metric Clock MetricFilter]
+           [org.coursera.metrics.datadog DatadogReporter DatadogReporter$Builder MetricNameFormatter]
            [java.util.concurrent TimeUnit])
   (:require [clojure.string :refer [blank?]]))
 
@@ -77,16 +77,42 @@
     (chain-register-metric registry name metric)
     metric))
 
-(defn ^DatadogReporter create-datadog-reporter [^MetricRegistry metric-registry ^Transport transport]
+(defn ^DatadogReporter create-datadog-reporter
+  [{:keys [^MetricRegistry metric-registry
+           ^Transport transport
+           ^Clock clock
+           ^TimeUnit rate-unit
+           ^TimeUnit duration-unit
+           ^MetricFilter metric-filter
+           ^MetricNameFormatter metric-name-formatter
+           tags]
+    :or   {^MetricRegistry metric-registry            nil
+           ^Transport transport                       nil
+           ^Clock clock                               nil
+           ^TimeUnit rate-unit                        nil
+           ^TimeUnit duration-unit                    nil
+           ^MetricFilter metric-filter                nil
+           ^MetricNameFormatter metric-name-formatter nil
+           tags                                       '()}}]
   (if (not metric-registry)
     (throw (IllegalArgumentException. "metric-registry must be not nil")))
   (if (not transport)
     (throw (IllegalArgumentException. "transport must be not nil")))
-  (-> ^DatadogReporter$Builder
-      (DatadogReporter/forRegistry metric-registry)
-      (.withTransport ^Transport transport)
-      (.convertDurationsTo ^TimeUnit TimeUnit/MILLISECONDS)
-      (.build)))
+  (let [^DatadogReporter$Builder builder (-> metric-registry
+                                             DatadogReporter/forRegistry
+                                             (.withTransport ^Transport transport)
+                                             (.withTags tags))]
+    (if clock
+      (.withClock builder ^Clock clock))
+    (if rate-unit
+      (.convertRatesTo builder ^TimeUnit rate-unit))
+    (if duration-unit
+      (.convertDurationsTo builder ^TimeUnit duration-unit))
+    (if metric-filter
+      (.filter builder ^MetricFilter metric-filter))
+    (if metric-name-formatter
+      (.withMetricNameFormatter builder ^MetricNameFormatter metric-name-formatter))
+    (.build builder)))
 
 (defonce ^:private DEFAULT-SCHEDULE-TIME-MS 10000)
 

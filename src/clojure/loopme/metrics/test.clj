@@ -2,15 +2,19 @@
   (:require [loopme.metrics.connectors :refer :all]
             [loopme.metrics.metrics :refer :all]))
 
-(def max-time 60)
-(def min-time 30)
+(def max-time 600)
+(def min-time 300)
 
 (defn metric-test
   ([] (metric-test {}))
   ([config]
-   (let [transport (create-udp-transport {:api-key "227d8cbbbe455977dbea9f98a126d1da"})
+   (let [transport (-> {:api-key "227d8cbbbe455977dbea9f98a126d1da"}
+                       create-udp-transport)
          metric-registry (create-metric-registry)
-         reporter (create-datadog-reporter metric-registry transport)
+         reporter (-> {:metric-registry metric-registry
+                       :transport       transport
+                       :tags            '("app:api_ads" "test:true")}
+                      create-datadog-reporter)
          counter (create-counter)
          const (create-gauge (Math/round (* 100 (Math/random))))
          timeout (create-gauge-fn #(- max-time (* (- max-time min-time) (Math/random))))
