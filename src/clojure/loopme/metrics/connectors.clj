@@ -6,7 +6,8 @@
            [java.util.concurrent TimeUnit])
   (:require [clojure.string :refer [blank?]]))
 
-(defn ^{:doc "
+(defn
+  ^{:doc "
   config for example:
 
  {:prefix nil
@@ -14,21 +15,21 @@
   :port   8125}
 
   "}
-      ^Transport
-      create-udp-transport
+  ^Transport create-udp-transport
   ([]
-    (create-udp-transport nil))
-  ([config]
+    (create-udp-transport {}))
+  ([{:keys [prefix host port]}]
     (let [builder (UdpTransport$Builder.)]
-      (if (-> config :prefix blank? not)
-        (.withPrefix builder (:prefix config)))
-      (if (-> config :host blank? not)
-        (.withStatsdHost builder (:host config)))
-      (if (-> config :port number?)
-        (.withPort builder (:port config)))
+      (if (-> prefix blank? not)
+        (.withPrefix builder prefix))
+      (if (-> host blank? not)
+        (.withStatsdHost builder host))
+      (if (-> port number?)
+        (.withPort builder port))
       (.build builder))))
 
-(defn ^{:doc "
+(defn
+  ^{:doc "
   config for example:
 
   {:api-key         \"FSDF98SYDF7YW79F9\"
@@ -36,23 +37,20 @@
    :socket-timeout  5000}
 
    "}
-      ^Transport
-      create-http-transport
+  ^Transport create-http-transport
   ([]
     (create-http-transport nil))
-  ([config]
-    (if (-> config :api-key blank?)
+  ([{:keys [api-key connect-timeout socket-timeout]}]
+    (if (blank? api-key)
       (throw (IllegalArgumentException. "api-key must be setted")))
     (let [builder (HttpTransport$Builder.)]
-      (.withApiKey builder (:api-key config))
-      (let [^Integer connect-timeout (:connect-timeout config)]
-        (if (and (number? connect-timeout)
-                 (< 0 connect-timeout))
-          (.withConnectTimeout builder connect-timeout)))
-      (let [^Integer socket-timeout (:socket-timeout config)]
-        (if (and (number? socket-timeout)
-                 (< 0 socket-timeout))
-          (.withSocketTimeout builder socket-timeout)))
+      (.withApiKey builder api-key)
+      (if (and (number? connect-timeout)
+               (< 0 connect-timeout))
+        (.withConnectTimeout builder connect-timeout))
+      (if (and (number? socket-timeout)
+               (< 0 socket-timeout))
+        (.withSocketTimeout builder socket-timeout))
       (.build builder))))
 
 (defn ^MetricRegistry create-metric-registry []
@@ -70,6 +68,10 @@
     registry))
 
 (defn ^Metric register-metric
+  ([{:keys [registry metric name]}]
+    (if name
+      (register-metric registry name metric)
+      (register-metric registry metric)))
   ([^MetricRegistry registry ^Metric metric]
     (chain-register-metric registry metric)
     metric)
@@ -128,3 +130,14 @@
   (if reporter
     (.stop reporter))
   reporter)
+
+(comment
+  ; example
+  (let [transport (create-udp-transport)
+        metric-registry (create-metric-registry)
+        reporter (-> {:metric-registry metric-registry
+                      :transport       transport
+                      :tags            '("app:api_ads" "test:true")}
+                     create-datadog-reporter)]
+    (start-reporter reporter)
+    (stop-reporter reporter)))
