@@ -10,7 +10,7 @@
                             "-source" "1.7"
                             "-Xlint:-options"]
             :plugins [[s3-wagon-private "1.1.2"]]
-            :warn-on-reflection true
+            :global-vars {*warn-on-reflection* true}
             :repositories [["loopme" {:url           "s3p://lm-artifacts/releases/"
                                       :username      :env
                                       :passphrase    :env

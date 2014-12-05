@@ -3,7 +3,8 @@
   (:import [org.coursera.metrics.datadog.transport Transport HttpTransport$Builder UdpTransport$Builder]
            [com.codahale.metrics MetricRegistry Metric Clock MetricFilter]
            [org.coursera.metrics.datadog DatadogReporter DatadogReporter$Builder MetricNameFormatter]
-           [java.util.concurrent TimeUnit])
+           [java.util.concurrent TimeUnit]
+           (loopme.metrics SafeMetricRegistry SafeMetricRegistry$Builder))
   (:require [clojure.string :refer [blank?]]))
 
 (defn
@@ -53,8 +54,14 @@
         (.withSocketTimeout builder socket-timeout))
       (.build builder))))
 
-(defn ^MetricRegistry create-metric-registry []
-  (MetricRegistry.))
+(defn ^MetricRegistry create-metric-registry
+  ([]
+    (MetricRegistry.))
+  ([{:keys [override]
+     :or   {override true}}]
+    (-> (SafeMetricRegistry$Builder.)
+        (.setOverride override)
+        (.build))))
 
 (defn ^MetricRegistry chain-register-metric
   ([^MetricRegistry registry ^Metric metric]
