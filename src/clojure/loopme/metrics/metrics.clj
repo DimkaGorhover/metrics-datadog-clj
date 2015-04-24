@@ -1,6 +1,6 @@
 (ns loopme.metrics.metrics
-  (:import [com.codahale.metrics Gauge Counter Timer Clock Clock$UserTimeClock Clock$CpuTimeClock Reservoir ExponentiallyDecayingReservoir Histogram]
-           [loopme.metrics Factory SettableGauge]
+  (:import [com.codahale.metrics Gauge Counter Timer Clock Clock$UserTimeClock Clock$CpuTimeClock Reservoir ExponentiallyDecayingReservoir Histogram Snapshot]
+           [loopme.metrics Factory SettableGauge FutureCounter FutureHistogram]
            [java.util.concurrent TimeUnit]))
 
 (defn- is? [object clazz]
@@ -13,98 +13,150 @@
 (defn- clock? [clock] (is? clock Clock))
 (defn- gauge? [gauge] (is? gauge Gauge))
 (defn- settable-gauge? [gauge] (is? gauge SettableGauge))
+(defn- time-unit? [time-unit] (is? time-unit TimeUnit))
 
-(defn- ^Reservoir default-reservoir []
+(defn- ^Reservoir reservoir:default []
   (ExponentiallyDecayingReservoir.))
+
+; =============================================================================
+; clock
+
+(defn ^Clock clock:default []
+  (Clock/defaultClock))
+
+(defn ^TimeUnit clock:default-time-unit []
+  TimeUnit/NANOSECONDS)
+
+(defn ^Clock clock:user []
+  (Clock$UserTimeClock.))
+
+(defn ^Clock clock:cpu []
+  (Clock$CpuTimeClock.))
+
+(defn ^Long clock:tick [^Clock clock]
+  (when (clock? clock)
+    (.getTick ^Clock clock)))
+
+(defn ^Long clock:time [^Clock clock]
+  (when (clock? clock)
+    (.getTime ^Clock clock)))
+
+(comment
+
+  (clock:default)
+  ;=> #<UserTimeClock com.codahale.metrics.Clock$UserTimeClock@892c746>
+
+  (clock:default-time-unit)
+  ;=> #<NANOSECONDS>
+
+  (def clock (clock:user))
+
+  (def clock (clock:cpu))
+
+  (def clock (clock:cpu))
+  (clock:tick clock)
+
+  (def clock (clock:cpu))
+
+  (clock:time clock)
+  ;=> (System/currentTimeMillis)
+
+  )
 
 ; =============================================================================
 ; gauge
 
-(defn ^Gauge create-gauge
-  ([]
-   (create-gauge 0))
-  ([^Number value]
-   (if (number? value)
-     (Factory/gauge ^Number value))))
-
-(comment
-
-  (create-gauge 1)
-  (create-gauge 10.42)
-  )
-
-(defn ^Gauge create-gauge-fn [^Callable func]
+(defn ^Gauge gauge:fn [^Callable func]
   (when (fn? func)
     (let [res (func)]
       (when (number? res)
         (Factory/gauge ^Callable func)))))
 
-(comment
+(defn ^Gauge gauge:create
+  ([]
+   (gauge:create 0))
+  ([value]
+   (or
+     (when (number? value)
+       (Factory/gauge ^Number value))
+     (when (fn? value)
+       (gauge:fn value)))))
 
-  (create-gauge-fn #(Math/random))
-  (create-gauge-fn #(* 10 (Math/random)))
-
-  (create-gauge-fn (fn [] (Math/random)))
-  (create-gauge-fn (fn [] (* 10 (Math/random))))
-  )
-
-(defn ^Number get-gauge-val [^Gauge gauge]
+(defn ^Number gauge:get [^Gauge gauge]
   (when (gauge? gauge)
     (.getValue ^Gauge gauge)))
 
-(defn ^Counter set-gauge-val [^SettableGauge gauge ^Number number]
-  (when (and (settable-gauge? gauge) number)
-    (.setValue ^SettableGauge gauge number)))
+(defn ^Gauge gauge:set [^SettableGauge gauge value]
+  (when (settable-gauge? gauge)
+    (or
+      (when (number? value)
+        (.setValue ^SettableGauge gauge ^Number value))
+      (when (fn? value)
+        (.setValue ^SettableGauge gauge ^Callable value)))
+    gauge))
+
+(defmacro
+  ^{:arglists '([gauge & body]
+                 [gauge {:keys [^TimeUnit time-unit]} & body])}
+  gauge:timed-macro [gauge & body]
+  (if-not (and gauge (-> gauge eval gauge?))
+    `(do ~@body)
+    (let [{:keys [time-unit]} (first body)
+          time-unit (when (time-unit? (eval time-unit))
+                      time-unit)]
+      `(let [start-time# (clock:tick (clock:default))]
+         (try
+           (do ~@body)
+           (finally
+             (gauge:set ~gauge
+                        (.convert (or ~time-unit (clock:default-time-unit))
+                                  (- (clock:tick (clock:default)) start-time#)
+                                  (clock:default-time-unit)))))))))
 
 (comment
 
-  (def gauge (create-gauge 1))
-  (println (get-gauge-val gauge))
+  (gauge:create 1)
+  (gauge:create 10.42)
+
+  (gauge:fn #(Math/random))
+  (gauge:fn #(* 10 (Math/random)))
+
+  (gauge:fn (fn [] (Math/random)))
+  (gauge:fn (fn [] (* 10 (Math/random))))
+
+  (def gauge (gauge:create 1))
+  (gauge:get gauge)
   ;=> 1
 
-  (set-gauge-val gauge 235.23)
-  (println (get-gauge-val gauge))
+  (gauge:set gauge 235.23)
+  (gauge:get gauge)
   ;=> 235.23
-  )
 
-(defmacro timed-gauge-macro [^Gauge gauge & body]
-  (if gauge
-    `(let [func# (fn [] ~@body)
-           start-time# (System/nanoTime)]
-       (try
-         (func#)
-         (finally
-           (let [stop-time# (System/nanoTime)]
-             (set-gauge-val ~gauge (- stop-time# start-time#))))))
-    `(do ~@body)))
-
-(comment
-
-  (def gauge (create-gauge))
-  (timed-gauge-macro gauge (+ 10 2))
+  (def gauge (gauge:create))
+  (gauge:timed-macro gauge (+ 10 2))
   ;=> 12
 
-  (get-gauge-val gauge)
+  (gauge:get gauge)
   ;=> 418946
   )
 
 ; =============================================================================
 ; counter
 
-(defn ^Counter create-counter []
-  (Counter.))
+(defn ^Counter counter:create []
+  (FutureCounter.))
 
-(defn ^Number get-count [^Counter counter]
+(defn ^Number counter:get [^Counter counter]
   (when (counter? counter)
     (.getCount ^Counter counter)))
 
 (comment
 
-  (def counter (create-counter))
-  (println (get-count counter))
+  (def counter (counter:create))
+  (println (counter:get counter))
   )
 
-(defn ^Counter inc-counter
+(defn ^Counter counter:inc
   ([^Counter counter]
    (when (counter? counter)
      (.inc ^Counter counter))
@@ -118,16 +170,16 @@
 
 (comment
 
-  (def counter (create-counter))
+  (def counter (counter:create))
 
-  (inc-counter counter)
-  (inc-counter counter 10)
+  (counter:inc counter)
+  (counter:inc counter 10)
 
-  (inc-counter counter nil) => (inc-counter counter)
-  (inc-counter counter "asdasd") => (inc-counter counter)
+  (counter:inc counter nil) => (counter:inc counter)
+  (counter:inc counter "asdasd") => (counter:inc counter)
   )
 
-(defn ^Counter dec-counter
+(defn ^Counter counter:dec
   ([^Counter counter]
    (when (counter? counter)
      (.dec ^Counter counter))
@@ -141,111 +193,60 @@
 
 (comment
 
-  (def counter (create-counter))
+  (def counter (counter:create))
 
-  (dec-counter counter)
-  (dec-counter counter 10)
+  (counter:dec counter)
+  (counter:dec counter 10)
 
-  (dec-counter counter nil)
+  (counter:dec counter nil)
   ;=> (dec-counter counter)
-  (dec-counter counter "asdasd")
+  (counter:dec counter "asdasd")
   ;=> (dec-counter counter)
 
-  )
-
-; =============================================================================
-; clock
-
-(def ^:priavate ^Clock default-clock (Clock/defaultClock))
-
-(defn ^Clock create-user-clock []
-  (Clock$UserTimeClock.))
-
-(comment
-
-  (def clock (create-user-clock))
-  )
-
-(defn ^Clock create-cpu-clock []
-  (Clock$CpuTimeClock.))
-
-(comment
-
-  (def clock (create-cpu-clock))
-  )
-
-(defn ^Long clock-tick [^Clock clock]
-  (when (clock? clock)
-    (.getTick ^Clock clock)))
-
-(comment
-
-  (def clock (create-cpu-clock))
-  (clock-tick clock)
-  )
-
-(defn ^Long clock-time [^Clock clock]
-  (when (clock? clock)
-    (.getTime ^Clock clock)))
-
-(comment
-
-  (def clock (create-cpu-clock))
-  (clock-time clock)
   )
 
 ; =============================================================================
 ; timer
 
-(defn ^Timer create-timer
+(defn ^Timer timer:create
   ([]
    (Timer.))
   ([^Clock clock]
    (if clock
-     (create-timer (default-reservoir) clock)
-     (create-timer)))
+     (timer:create (reservoir:default) clock)
+     (timer:create)))
   ([^Reservoir reservoir ^Clock clock]
-   (Timer. (or reservoir (default-reservoir))
-           (or clock default-clock))))
+   (Timer. (or reservoir (reservoir:default))
+           (or clock (clock:default)))))
 
-(comment
-
-  (def timer (create-timer))
-
-  (def clock (create-clock))
-  (def timer (create-timer clock))
-
-  )
-
-(defn ^Timer timer-update
-  ([^Timer timer ^Long timeout-ms]
-   (timer-update timer timeout-ms nil))
+(defn ^Timer timer:update
+  (^:deprecated [^Timer timer ^Long timeout-ms]
+   (timer:update timer timeout-ms nil))
   ([^Timer timer ^Long timeout ^TimeUnit time-unit]
    (if (and (timer? timer) timeout)
      (.update ^Timer timer timeout (or time-unit TimeUnit/MILLISECONDS)))
    timer))
 
-(comment
-
-  (import '[java.util.concurrent TimeUnit])
-
-  (def timer (create-timer))
-
-  (timer-update timer 1000)
-  (timer-update timer 1000 TimeUnit/MILLISECONDS)
-
-  )
-
-(defmacro timed-macro [^Timer timer & body]
+(defmacro timer:macro [^Timer timer & body]
   (if (timer? timer)
-    `(.time ^Timer ~timer
-            ^Callable (fn [] ~@body))
+    `(.time ^Timer ~timer ^Callable (fn [] ~@body))
     `(do ~@body)))
 
 (comment
 
-  (def timer (create-timer))
-  (timed-macro timer (+ 10 2))
+  (def timer (timer:create))
+  (def timer (timer:create (clock:user)))
+
+  (import '[java.util.concurrent TimeUnit])
+
+  (def timer (timer:create))
+
+  (timer:update timer 1000)
+  (timer:update timer 1000 TimeUnit/MILLISECONDS)
+
+
+  (def timer (timer:create))
+  (timer:macro timer (+ 10 2))
   ;=> 12
 
   )
@@ -253,31 +254,49 @@
 ; =============================================================================
 ; histogram
 
-(defn ^Histogram create-histogram
+(defn ^Histogram histogram:create
   ([]
-   (create-histogram nil))
+   (histogram:create nil))
   ([^Reservoir reservoir]
-   (Histogram. (or reservoir (default-reservoir)))))
+   (FutureHistogram. (or reservoir (reservoir:default)))))
 
-(defn ^Histogram histogram-update [^Histogram histogram value]
+(defn ^Histogram histogram:update [^Histogram histogram value]
   (when (and (histogram? histogram) value)
     (.update ^Histogram histogram value)
     histogram))
 
-(defn histogram-count [^Histogram histogram]
+(defn histogram:count [^Histogram histogram]
   (when (histogram? histogram)
     (.getCount ^Histogram histogram)))
 
+(defn ^Snapshot histogram:snapshot [^Histogram histogram]
+  (when (histogram? histogram)
+    (.getSnapshot ^Histogram histogram)))
+
 (comment
 
-  (let [hist (create-histogram)]
-    (histogram-update hist 10)
-    (histogram-update hist 10)
-    (histogram-update hist 20)
-    (histogram-update hist 10)
-    (histogram-update hist 10)
+  (let [hist (histogram:create)]
+    (histogram:update hist 10)
+    (histogram:update hist 10)
+    (histogram:update hist 20)
+    (histogram:update hist 10)
+    (histogram:update hist 10)
 
-    (histogram-count hist)
+    (histogram:count hist)
     ; => 5
+
+    (histogram:snapshot hist)
+
+    @hist
+    ;=> {:min 10.0,
+    ;    :mean 12.0,
+    ;    :75 15.0,
+    ;    :95 20.0,
+    ;    :98 20.0,
+    ;    :median 10.0,
+    ;    :max 20.0,
+    ;    :999 20.0,
+    ;    :std-dev 4.47213595499958,
+    ;    :99 20.0}
 
     ))

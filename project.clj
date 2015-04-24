@@ -1,4 +1,4 @@
-(defproject loopme/metrics-datadog-clj "0.1.7-SNAPSHOT"
+(defproject loopme/metrics-datadog-clj "0.2.1-SNAPSHOT"
             :description "Loopme lib for working with ES"
             :url "http://loopme.biz"
             :license {:name "MIT license"
