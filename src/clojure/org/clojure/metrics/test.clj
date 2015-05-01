@@ -1,6 +1,6 @@
-(ns loopme.metrics.test
-  (:require [loopme.metrics.connectors :refer :all]
-            [loopme.metrics.metrics :refer :all]))
+(ns org.clojure.metrics.test
+  (:require [org.clojure.metrics.connectors :refer :all]
+            [org.clojure.metrics.metrics :refer :all]))
 
 (def max-time 600)
 (def min-time 300)

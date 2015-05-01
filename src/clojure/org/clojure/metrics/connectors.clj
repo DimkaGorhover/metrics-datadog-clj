@@ -1,4 +1,4 @@
-(ns loopme.metrics.connectors
+(ns org.clojure.metrics.connectors
   (:refer-clojure :exclude [replace])
   (:import [org.coursera.metrics.datadog.transport Transport HttpTransport$Builder UdpTransport$Builder]
            [com.codahale.metrics MetricRegistry Metric Clock MetricFilter]

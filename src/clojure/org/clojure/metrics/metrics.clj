@@ -1,6 +1,6 @@
-(ns loopme.metrics.metrics
-  (:import [com.codahale.metrics Gauge Counter Timer Clock Clock$UserTimeClock Clock$CpuTimeClock Reservoir ExponentiallyDecayingReservoir Histogram Snapshot]
-           [loopme.metrics Factory SettableGauge FutureCounter FutureHistogram]
+(ns org.clojure.metrics.metrics
+  (:import [com.codahale.metrics Gauge Counter Timer Clock Reservoir ExponentiallyDecayingReservoir Histogram Snapshot]
+           [org.clojure.metrics SettableGauge FutureCounter FutureHistogram Metrics]
            [java.util.concurrent TimeUnit]))
 
 (defn- is? [object clazz]
@@ -21,17 +21,10 @@
 ; =============================================================================
 ; clock
 
-(defn ^Clock clock:default []
-  (Clock/defaultClock))
-
-(defn ^TimeUnit clock:default-time-unit []
-  TimeUnit/NANOSECONDS)
-
-(defn ^Clock clock:user []
-  (Clock$UserTimeClock.))
-
-(defn ^Clock clock:cpu []
-  (Clock$CpuTimeClock.))
+(defn ^Clock clock:default [] (Metrics/defaultClock))
+(defn ^TimeUnit clock:default-time-unit [] (Metrics/defaultTimeUnit))
+(defn ^Clock clock:user [] (Metrics/userTimeClock))
+(defn ^Clock clock:cpu [] (Metrics/cpuTimeClock))
 
 (defn ^Long clock:tick [^Clock clock]
   (when (clock? clock)
@@ -70,7 +63,7 @@
   (when (fn? func)
     (let [res (func)]
       (when (number? res)
-        (Factory/gauge ^Callable func)))))
+        (Metrics/gauge ^Callable func)))))
 
 (defn ^Gauge gauge:create
   ([]
@@ -78,7 +71,7 @@
   ([value]
    (or
      (when (number? value)
-       (Factory/gauge ^Number value))
+       (Metrics/gauge ^Number value))
      (when (fn? value)
        (gauge:fn value)))))
 

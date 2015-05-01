@@ -1,4 +1,4 @@
-package loopme.metrics;
+package org.clojure.metrics;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;

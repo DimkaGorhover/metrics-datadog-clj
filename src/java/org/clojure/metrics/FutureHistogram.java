@@ -1,4 +1,4 @@
-package loopme.metrics;
+package org.clojure.metrics;
 
 import clojure.lang.IPersistentMap;
 import clojure.lang.Keyword;

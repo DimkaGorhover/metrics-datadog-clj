@@ -1,4 +1,4 @@
-package loopme.metrics;
+package org.clojure.metrics;
 
 import com.codahale.metrics.Gauge;
 
